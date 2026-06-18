@@ -1,0 +1,234 @@
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+
+// Game objects
+const game = {
+    width: canvas.width,
+    height: canvas.height,
+    playerScore: 0,
+    computerScore: 0
+};
+
+// Paddle properties
+const paddle = {
+    width: 15,
+    height: 80,
+    speed: 6
+};
+
+// Player paddle (left)
+const player = {
+    x: 10,
+    y: game.height / 2 - paddle.height / 2,
+    width: paddle.width,
+    height: paddle.height,
+    dy: 0
+};
+
+// Computer paddle (right)
+const computer = {
+    x: game.width - paddle.width - 10,
+    y: game.height / 2 - paddle.height / 2,
+    width: paddle.width,
+    height: paddle.height,
+    dy: 0,
+    speed: 5
+};
+
+// Ball properties
+const ball = {
+    x: game.width / 2,
+    y: game.height / 2,
+    radius: 7,
+    dx: 5,
+    dy: 5,
+    speed: 5
+};
+
+// Input handling
+const keys = {};
+let mouseY = game.height / 2;
+
+document.addEventListener('keydown', (e) => {
+    keys[e.key] = true;
+});
+
+document.addEventListener('keyup', (e) => {
+    keys[e.key] = false;
+});
+
+canvas.addEventListener('mousemove', (e) => {
+    const rect = canvas.getBoundingClientRect();
+    mouseY = e.clientY - rect.top;
+});
+
+document.getElementById('resetBtn').addEventListener('click', resetGame);
+
+// Draw rectangle
+function drawRect(x, y, width, height, color) {
+    ctx.fillStyle = color;
+    ctx.fillRect(x, y, width, height);
+}
+
+// Draw circle
+function drawCircle(x, y, radius, color) {
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.arc(x, y, radius, 0, Math.PI * 2);
+    ctx.fill();
+}
+
+// Draw text
+function drawText(text, x, y, size, color) {
+    ctx.fillStyle = color;
+    ctx.font = `${size}px Arial`;
+    ctx.textAlign = 'center';
+    ctx.fillText(text, x, y);
+}
+
+// Update player paddle
+function updatePlayer() {
+    // Arrow keys
+    if (keys['ArrowUp'] && player.y > 0) {
+        player.y -= paddle.speed;
+    }
+    if (keys['ArrowDown'] && player.y < game.height - paddle.height) {
+        player.y += paddle.speed;
+    }
+
+    // Mouse control
+    const targetY = mouseY - paddle.height / 2;
+    const maxY = game.height - paddle.height;
+    player.y = Math.max(0, Math.min(targetY, maxY));
+}
+
+// Update computer paddle (AI)
+function updateComputer() {
+    const computerCenter = computer.y + paddle.height / 2;
+    const ballCenter = ball.y;
+
+    // Simple AI: follow the ball
+    if (computerCenter < ballCenter - 35) {
+        computer.y += computer.speed;
+    } else if (computerCenter > ballCenter + 35) {
+        computer.y -= computer.speed;
+    }
+
+    // Keep paddle in bounds
+    if (computer.y < 0) {
+        computer.y = 0;
+    }
+    if (computer.y > game.height - paddle.height) {
+        computer.y = game.height - paddle.height;
+    }
+}
+
+// Update ball
+function updateBall() {
+    ball.x += ball.dx;
+    ball.y += ball.dy;
+
+    // Collision with top and bottom walls
+    if (ball.y - ball.radius < 0 || ball.y + ball.radius > game.height) {
+        ball.dy = -ball.dy;
+        ball.y = ball.y - ball.radius < 0 ? ball.radius : game.height - ball.radius;
+    }
+
+    // Collision with player paddle
+    if (
+        ball.x - ball.radius < player.x + player.width &&
+        ball.y > player.y &&
+        ball.y < player.y + player.height
+    ) {
+        ball.dx = -ball.dx;
+        ball.x = player.x + player.width + ball.radius;
+
+        // Add spin based on where ball hits paddle
+        const collidePoint = ball.y - (player.y + player.height / 2);
+        ball.dy = (collidePoint / (player.height / 2)) * ball.speed;
+    }
+
+    // Collision with computer paddle
+    if (
+        ball.x + ball.radius > computer.x &&
+        ball.y > computer.y &&
+        ball.y < computer.y + computer.height
+    ) {
+        ball.dx = -ball.dx;
+        ball.x = computer.x - ball.radius;
+
+        // Add spin based on where ball hits paddle
+        const collidePoint = ball.y - (computer.y + computer.height / 2);
+        ball.dy = (collidePoint / (computer.height / 2)) * ball.speed;
+    }
+
+    // Score points
+    if (ball.x - ball.radius < 0) {
+        game.computerScore++;
+        resetBall();
+    }
+    if (ball.x + ball.radius > game.width) {
+        game.playerScore++;
+        resetBall();
+    }
+
+    // Update score display
+    document.getElementById('playerScore').textContent = game.playerScore;
+    document.getElementById('computerScore').textContent = game.computerScore;
+}
+
+// Reset ball to center
+function resetBall() {
+    ball.x = game.width / 2;
+    ball.y = game.height / 2;
+    ball.dx = (Math.random() > 0.5 ? 1 : -1) * ball.speed;
+    ball.dy = (Math.random() - 0.5) * ball.speed;
+}
+
+// Reset entire game
+function resetGame() {
+    game.playerScore = 0;
+    game.computerScore = 0;
+    resetBall();
+    player.y = game.height / 2 - paddle.height / 2;
+    computer.y = game.height / 2 - paddle.height / 2;
+    document.getElementById('playerScore').textContent = '0';
+    document.getElementById('computerScore').textContent = '0';
+}
+
+// Draw everything
+function draw() {
+    // Clear canvas
+    drawRect(0, 0, game.width, game.height, '#000');
+
+    // Draw center line
+    ctx.strokeStyle = '#fff';
+    ctx.setLineDash([5, 5]);
+    ctx.beginPath();
+    ctx.moveTo(game.width / 2, 0);
+    ctx.lineTo(game.width / 2, game.height);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Draw paddles
+    drawRect(player.x, player.y, player.width, player.height, '#00FF00');
+    drawRect(computer.x, computer.y, computer.width, computer.height, '#FF0000');
+
+    // Draw ball
+    drawCircle(ball.x, ball.y, ball.radius, '#FFFF00');
+
+    // Draw FPS (optional)
+    drawText('Ball Speed: ' + Math.round(Math.sqrt(ball.dx * ball.dx + ball.dy * ball.dy)), game.width / 2, 20, 14, '#fff');
+}
+
+// Main game loop
+function gameLoop() {
+    updatePlayer();
+    updateComputer();
+    updateBall();
+    draw();
+    requestAnimationFrame(gameLoop);
+}
+
+// Start the game
+gameLoop();
